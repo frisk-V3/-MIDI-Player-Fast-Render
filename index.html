@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>MIDI Player Fast Render</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
+
+<style>
+body {
+  background: #121212;
+  color: #fff;
+  font-family: "Segoe UI", sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+}
+
+.card {
+  background: #1e1e1e;
+  padding: 24px;
+  border-radius: 14px;
+  width: 380px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 20px;
+  color: #7df;
+  text-shadow: 0 0 6px #7df;
+}
+
+#drop-zone {
+  border: 2px dashed #555;
+  padding: 20px;
+  text-align: center;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  transition: 0.2s;
+}
+
+#drop-zone.dragover {
+  border-color: #7df;
+  box-shadow: 0 0 10px #7df;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  background: #2b2b2b;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+button:hover:not(:disabled) {
+  border-color: #7df;
+  box-shadow: 0 0 10px #7df;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+</style>
+</head>
+
+<body>
+<div class="card">
+  <h2>　　　　　　 MIDI プレイヤー</h2>
+
+  <div id="drop-zone">
+    <p>ここをクリックするか<br>MIDIファイルをドロップしてください</p>
+    <input id="midi-file" type="file" accept=".mid,.midi" style="display:none;">
+  </div>
+
+  <button id="play-normal" disabled>▶ 通常再生（BPM 120）</button>
+  <button id="play-fast" disabled>⚡ 高速再生（BPM 1000）</button>
+  <button id="stop" disabled>■ 停止</button>
+</div>
+
+<script>
+let midiData = null;
+let synths = [];
+
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("midi-file");
+
+dropZone.onclick = () => fileInput.click();
+
+dropZone.ondragover = (e) => {
+  e.preventDefault();
+  dropZone.classList.add("dragover");
+};
+
+dropZone.ondragleave = () => dropZone.classList.remove("dragover");
+
+dropZone.ondrop = (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("dragover");
+  loadMIDI(e.dataTransfer.files[0]);
+};
+
+fileInput.onchange = (e) => loadMIDI(e.target.files[0]);
+
+async function loadMIDI(file) {
+  const array = await file.arrayBuffer();
+  midiData = new Midi(array);
+
+  dropZone.innerHTML = `<p>${file.name} を読み込みました</p>`;
+  document.getElementById("play-normal").disabled = false;
+  document.getElementById("play-fast").disabled = false;
+}
+
+// MIDI 再生関数
+function playMIDI() {
+  synths.forEach(s => s.dispose());
+  synths = [];
+
+  midiData.tracks.forEach(track => {
+    const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+    synths.push(synth);
+
+    track.notes.forEach(note => {
+      synth.triggerAttackRelease(
+        note.name,
+        note.duration,
+        note.time,
+        note.velocity
+      );
+    });
+  });
+
+  Tone.Transport.start();
+}
+
+// 通常再生
+document.getElementById("play-normal").onclick = async () => {
+  await Tone.start();
+  Tone.Transport.stop();
+  Tone.Transport.position = 0;
+  Tone.Transport.bpm.value = 120;
+
+  playMIDI();
+  document.getElementById("stop").disabled = false;
+};
+
+// 高速再生
+document.getElementById("play-fast").onclick = async () => {
+  await Tone.start();
+  Tone.Transport.stop();
+  Tone.Transport.position = 0;
+  Tone.Transport.bpm.value = 1000;
+
+  playMIDI();
+  document.getElementById("stop").disabled = false;
+};
+
+// 停止
+document.getElementById("stop").onclick = () => {
+  Tone.Transport.stop();
+  synths.forEach(s => s.dispose());
+  synths = [];
+};
+</script>
+
+</body>
+</html>
